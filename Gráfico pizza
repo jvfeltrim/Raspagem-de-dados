@@ -1,0 +1,49 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+URL = "https://blog.empresometro.com.br/confira-o-ranking-das-100-maiores-empresas-do-mundo/"
+pagina = requests.get(URL)
+
+soup = BeautifulSoup(pagina.content, "html.parser")
+
+
+table = soup.find('table')
+
+data = []
+header = []
+
+for linhas in table.find_all('tr'):
+    colunas = linhas.find_all('td')
+    if not header:
+        header = [coluna.text.strip() for coluna in colunas]
+    else:
+        data.append([coluna.text.strip() for coluna in colunas])
+
+
+df = pd.DataFrame(data, columns=header)
+
+df['Valor de Mercado'] = df['Valor de Mercado'].str.strip('$').str.replace(',', '', regex=True)
+df['Valor de Mercado'] = df['Valor de Mercado'].str.replace('.','')
+df['Valor de Mercado'] = df['Valor de Mercado'].astype(float)
+maior_valor = df[df['Valor de Mercado'] == df['Valor de Mercado'].max()]
+menor_valor = df[df['Valor de Mercado'] == df['Valor de Mercado'].min()]
+
+print("Empresa com maior valor de mercado:")
+print(maior_valor)
+
+print("Empresa com menor valor de mercado:")
+print(menor_valor)
+df['País']= df['País'].str.replace('Japan','Japão')
+paises = df['País'].unique()
+print("Países listados na tabela:")
+print(paises)
+
+
+import matplotlib.pyplot as plt
+
+pais_count = df['País'].value_counts()
+plt.figure(figsize=(8, 8))
+plt.pie(pais_count, labels=pais_count.index, autopct='%1.1f%%')
+plt.title('Distribuição das Empresas por País')
+plt.show()
