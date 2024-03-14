@@ -1,0 +1,110 @@
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+
+(async () => {
+    // Inicialize o Puppeteer
+    const browser = await puppeteer.launch();
+
+    // Abra uma nova página
+    const page = await browser.newPage();
+
+    try {
+        // Navegue para a página desejada
+        await page.goto('https://gol.gg/champion/list/season-S14/split-Spring/tournament-ALL/', { waitUntil: 'domcontentloaded' });
+        console.log('Página carregada');
+
+        // Aguarde um curto período de tempo (por exemplo, 2 segundos) para garantir que todos os elementos sejam renderizados
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Extraia os dados da página
+        const championsData = await page.evaluate(() => {
+            const data = [];
+            const rows = document.querySelectorAll('table tbody tr');
+            // Começa a iteração a partir do segundo tr (índice 1)
+            for (let i = 5; i < rows.length; i++) {
+                const row = rows[i];
+                const rowData = {};
+                const columns = row.querySelectorAll('td');
+                rowData.name = columns[0]?.textContent.trim(); // Corrigido para selecionar o nome do campeão
+                rowData.picks = columns[1]?.textContent.trim();
+                rowData.bans = columns[2]?.textContent.trim();
+                rowData.presence = columns[3]?.textContent.trim();
+                rowData.wins = columns[4]?.textContent.trim();
+                rowData.losses = columns[5]?.textContent.trim();
+                rowData.wr = columns[6]?.textContent.trim();
+                rowData.kda = columns[7]?.textContent.trim();
+                rowData.dpm = columns[8]?.textContent.trim();
+                data.push(rowData);
+            }
+            return data;
+        });
+
+        // Salve os dados em um arquivo JSON
+        fs.writeFileSync('data.json', JSON.stringify(championsData));
+
+        // Registre uma mensagem de sucesso no console
+        console.log('Dados extraídos com sucesso.');
+
+        // Cria a tabela HTML
+        const tableHTML = createHTMLTable(championsData);
+
+        // Salva a tabela HTML em um arquivo
+        fs.writeFileSync('table.html', tableHTML);
+
+        console.log('Tabela HTML gerada com sucesso.');
+
+    } catch (error) {
+        // Registre uma mensagem de erro no console
+        console.error('Ocorreu um erro: ', error);
+    } finally {
+        // Feche o navegador
+        await browser.close();
+    }
+})();
+
+// Função para criar a tabela HTML a partir dos dados
+function createHTMLTable(data) {
+    let html = `
+    <div class="table-responsive">
+    <table id="championsTable" class="table table-striped" border="1">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Picks</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    // Itera sobre os dados para criar as linhas da tabela
+    data.forEach(champion => {
+        html += `
+        <tr>
+            <td>${champion.name}</td>
+            <td>${champion.role}</td>
+        </tr>
+        `;
+    });
+
+    html += `
+        </tbody>
+    </table>
+    </div>
+    `;
+
+    // Incluir scripts para DataTables
+    html += `
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
+    <script>
+        $(document).ready(function() {
+            $('#championsTable').DataTable({
+                "paging": false
+            });
+        });
+    </script>
+    `;
+
+    return html;
+}
